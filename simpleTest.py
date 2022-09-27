@@ -95,9 +95,7 @@ try:
     defaultIdleFps = sim.getInt32Param(sim.intparam_idle_fps)
     sim.setInt32Param(sim.intparam_idle_fps, 0)
 
-    client.setStepping(True)
-    sim.startSimulation()
-
+    # Fetch the ID of the obstacle sensor
     object_ids = sim.getObjectsInTree(
         sim.getObject("/Floor")
     )
@@ -105,12 +103,12 @@ try:
     alias_to_ids = {sim.getObjectAlias(id): id for id in object_ids}
     obstacle_sensor = alias_to_ids["ObstacleSensor"]
 
-    dt = 0.05
+    client.setStepping(True)
+    sim.startSimulation()
+
     t = 0
-    forces = []
-    accelerations = []
-    tissemenn = []
-    while t < 7:
+    while t < 5:
+        t = sim.getSimulationTime()
         for i, joint in enumerate(boa.joints):
             angle = pi/3 * sin(t + i*pi/2)
             joint.setJointAngle(angle)
