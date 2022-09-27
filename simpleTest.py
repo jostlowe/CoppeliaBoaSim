@@ -122,7 +122,7 @@ try:
     sim.startSimulation()
 
     t = 0
-    while t < 15:
+    while t < 12:
         t = sim.getSimulationTime()
         for i, joint in enumerate(boa.joints):
             angle = pi/3 * sin(t + i*pi/2)
