@@ -6,6 +6,7 @@
 # blocking example, see simpleTest-nonBlocking.py
 
 import csv
+import json
 import time
 
 from zmqRemoteApi import RemoteAPIClient
@@ -23,6 +24,11 @@ class BoaLink:
         self.sim_id = link_sim_id
         self.sim = sim
 
+    def getOrientation(self):
+        _x, _y, z = self.sim.getObjectOrientation(
+            self.sim_id, sim.handle_world)
+        return z
+
 
 class BoaJoint:
     def __init__(self, sim, joint_id: int, sensor_id: int, accelerometer_id: int):
@@ -39,7 +45,7 @@ class BoaJoint:
         self.sim.setJointTargetPosition(self.joint_sim_id, angle)
 
     def getForceSensor(self):
-        _ret, force = self.sim.readForceSensor(self.sensor_sim_id)
+        _ret, force, _torque = self.sim.readForceSensor(self.sensor_sim_id)
         return np.array(force)[0:2]
 
     def getAccelerometer(self):
@@ -70,10 +76,17 @@ class Boa:
             alias_to_ids[f"AccelerometerSensor_{i}"] for i in range(n_joints)
         ]
 
+        link_ids = [
+            alias_to_ids[f"SnakeLink_{i}"] for i in range(n_joints+1)
+        ]
+
         self.joints = [
             BoaJoint(sim, *i)
             for i in zip(joint_ids, sensor_ids, accelerometer_ids)
         ]
+
+        print(link_ids)
+        self.links = [BoaLink(sim, id) for id in link_ids]
 
     def getJointAngles(self):
         return np.array([joint.getJointAngle() for joint in self.joints])
@@ -102,36 +115,66 @@ try:
 
     alias_to_ids = {sim.getObjectAlias(id): id for id in object_ids}
     obstacle_sensor = alias_to_ids["ObstacleSensor"]
+    obstacle = alias_to_ids["CylinderWithSensor"]
 
+    measurements = []
     client.setStepping(True)
     sim.startSimulation()
 
     t = 0
-    while t < 5:
+    while t < 15:
         t = sim.getSimulationTime()
         for i, joint in enumerate(boa.joints):
             angle = pi/3 * sin(t + i*pi/2)
             joint.setJointAngle(angle)
 
-        forces.append(boa.joints[3].getForceSensor()[0][1])
-        accelerations.append(boa.joints[3].getAccelerometer()[1])
-
-        _, tissemann, _ = sim.readForceSensor(obstacle_sensor)
-        print(tissemann[0:2])
-        tissemann = np.sqrt(tissemann[0]**2 + tissemann[1]**2)
-        tissemenn.append(-tissemann)
         client.step()
-        t += dt
+        '''
+        _ret, (fx, fy, _fz), _torque = sim.readForceSensor(obstacle_sensor)
 
+        joint_sensors = []
+        for joint in boa.joints:
+            acc_x, acc_y = joint.getAccelerometer()
+            cf_x, cf_y = joint.getForceSensor()
+            joint_angle = joint.getJointAngle()
+
+            joint_sensors.append({
+                "acc_x": acc_x,
+                "acc_y": acc_y,
+                "cf_x": cf_x,
+                "cf_y": cf_y,
+                "joint_angle": joint_angle
+            })
+
+        link_sensors = []
+        for link in boa.links:
+            link_angle = link.getOrientation()
+            collision, _ = sim.checkCollision(link.sim_id, obstacle)
+            link_sensors.append({
+                "link_angle": link_angle,
+                "collision": collision
+            })
+
+        measurements.append({
+            "sim_time": t,
+            "obstacle_sensor": {
+                "fx": fx,
+                "fy": fy
+            },
+            "joint_sensors": joint_sensors,
+            "link_sensors": link_sensors
+        })
+
+        '''
 
 finally:
     sim.stopSimulation()
     # Restore the original idle loop frequency:
     sim.setInt32Param(sim.intparam_idle_fps, defaultIdleFps)
 
+    with open("data.json", "w") as f:
+        json.dump(measurements, f, indent=4)
+
     print('Program ended')
 
-    res1 = [force + 2*acc for force, acc in zip(forces, accelerations)]
-    res2 = [force - 2*acc for force, acc in zip(forces, accelerations)]
-    plt.plot(list(zip(res1, res2, tissemenn)))
     plt.show()
