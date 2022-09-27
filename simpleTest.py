@@ -129,7 +129,6 @@ try:
             joint.setJointAngle(angle)
 
         client.step()
-        '''
         _ret, (fx, fy, _fz), _torque = sim.readForceSensor(obstacle_sensor)
 
         joint_sensors = []
@@ -164,8 +163,6 @@ try:
             "joint_sensors": joint_sensors,
             "link_sensors": link_sensors
         })
-
-        '''
 
 finally:
     sim.stopSimulation()
